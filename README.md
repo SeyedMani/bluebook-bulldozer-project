@@ -1,36 +1,103 @@
-# Predicting Bulldozer Sale Prices
+# Predicting Bulldozer Sale Prices Using Machine Learning
 
-An end-to-end machine learning project that predicts the **sale price of a bulldozer** from its characteristics (year made, model, hours of use, state, etc.) using Random Forest regression.
+This notebook explores a regression problem: **given a bulldozer's characteristics, can we predict the price it will sell for?**
 
-Data and the evaluation metric (Root Mean Squared Log Error — RMSLE) come from the [Kaggle Bluebook for Bulldozers competition](https://www.kaggle.com/c/bluebook-for-bulldozers/overview).
+It walks through a full end-to-end machine-learning workflow — problem definition, data exploration, preprocessing (parsing dates, handling missing values, encoding categoricals), modelling, hyperparameter tuning, and evaluation — using a Random Forest from Scikit-Learn.
 
-## What's in the notebook
+Because the data has a **time component** (we use past sales to predict future sales), this is also a time-series forecasting problem, which affects how we split train and validation.
 
-1. **Load and explore** the raw data (~400k bulldozer sales 1989–2011)
-2. **Preprocessing** — parse `saledate` into year/month/day features, handle missing values, ordinal-encode categorical columns
-3. **Train/validation split** by date (we predict the future, so the validation set must come from later sales than the training set)
-4. **Train** a `RandomForestRegressor` baseline and evaluate it with MAE, RMSLE, and R²
-5. **Tune** hyperparameters with `RandomizedSearchCV`
-6. **Save** the best model with `joblib`
-7. **Predict** on the test set and on a custom hand-built sample
-8. **Inspect feature importance** to see what actually drives the price
+---
 
-## Project Structure
+## 1. Problem Definition
+
+> Given the characteristics of a bulldozer (year made, model, hours of use, US state of sale, configuration options, etc.) and the prices similar bulldozers sold for in the past, can we predict its future sale price?
+
+## 2. Data
+
+The data comes from the [Kaggle Bluebook for Bulldozers competition](https://www.kaggle.com/c/bluebook-for-bulldozers/overview).
+
+It comes split into three files:
+
+| File | Rows | What's in it |
+|------|------|--------------|
+| `Train.csv` | ~400,000 | Sales up to end of 2011 — includes `SalePrice` (target) |
+| `Valid.csv` | ~12,000 | Sales Jan–Apr 2012 — includes `SalePrice` |
+| `Test.csv` | ~12,000 | Sales May–Nov 2012 — **no `SalePrice`** (this is what we predict) |
+
+The notebook actually uses `TrainAndValid.csv` (Train + Valid combined) and splits it by date later on, so the validation set is always strictly *after* the training set.
+
+The zipped dataset (`data/bluebook-for-bulldozers.zip`, ~69 MB) is included in this repo. Unzip it before running the notebook (see [Getting Started](#7-getting-started)).
+
+## 3. Evaluation
+
+Kaggle uses **Root Mean Squared Log Error (RMSLE)** for this competition — lower is better.
+
+> The goal is to get RMSLE as low as possible. Using a log error means the model is penalized more for getting cheap bulldozers wildly wrong than expensive ones, which makes sense because absolute errors mean different things at different price scales.
+
+We also report MAE and R² alongside RMSLE on the validation set, then compare to the [Kaggle leaderboard](https://www.kaggle.com/c/bluebook-for-bulldozers/leaderboard).
+
+## 4. Features
+
+The dataset has 50+ columns. The most important ones:
+
+| # | Feature | Description |
+|---|---------|-------------|
+| 1 | `SalesID` | Unique ID for each sale |
+| 2 | `SalePrice` | **Target** — what the bulldozer sold for, in USD |
+| 3 | `MachineID` | ID of the bulldozer (same machine can sell more than once) |
+| 4 | `ModelID` | ID of the bulldozer model |
+| 5 | `YearMade` | Year the bulldozer was manufactured |
+| 6 | `MachineHoursCurrentMeter` | Total hours the machine has been used at time of sale |
+| 7 | `UsageBand` | Low / Medium / High usage relative to similar models |
+| 8 | `saledate` | Date of the sale (parsed into year / month / day / day-of-week / day-of-year) |
+| 9 | `fiModelDesc` | Full model description |
+| 10 | `state` | US state where the sale happened |
+| 11 | `Enclosure` | Whether the cab is enclosed |
+| 12 | `Drive_System` | 2-wheel vs 4-wheel drive, etc. |
+| 13 | `ProductSize` | Mini / Compact / Small / Medium / Large / Large/Medium |
+| 14 | … | 40+ more configuration columns (forks, hydraulics, attachments, …) |
+
+A full data dictionary ships with the dataset (`Data Dictionary.xlsx` inside the zip).
+
+## 5. Approach
+
+Random Forest is the main model — it handles a mix of numerical and (encoded) categorical features well and gives feature importances for free.
+
+The notebook covers:
+
+- **Preprocessing**
+  - Parse `saledate` and break it into year / month / day / day-of-week / day-of-year columns
+  - Fill missing numerical values with the column median (and add a `_is_missing` flag column)
+  - Encode categorical columns with `OrdinalEncoder` (handling unknown categories at inference time)
+- **Modelling**
+  - Baseline `RandomForestRegressor` on a small sample for fast iteration
+  - Hyperparameter tuning with `RandomizedSearchCV`
+  - Final model trained with the best hyperparameters on the full training set
+- **Evaluation**
+  - MAE, RMSLE, R² on training **and** validation sets
+  - Feature importance bar chart
+- **Prediction**
+  - Predict the test set and write a Kaggle-style submission CSV
+  - Make a prediction on a single custom sample (e.g. a bulldozer from an online ad)
+
+---
+
+## 6. Project Structure
 
 ```
 bluebook-bulldozer-project/
-├── end-to-end-bluebook-bulldozer-price-regression-v2.ipynb   # the analysis
+├── end-to-end-bluebook-bulldozer-price-regression-v2.ipynb   # the full analysis
 ├── data/
 │   └── bluebook-for-bulldozers.zip                           # dataset (unzip before running)
-├── requirements.txt
+├── requirements.txt                                          # Python dependencies
 ├── .gitignore
 ├── LICENSE
 └── README.md
 ```
 
-> **Note:** The raw dataset (`bluebook-for-bulldozers/`, ~600 MB unzipped) and the trained model (`randomforest_regressor_best_RMSLE.pkl`, ~1 GB) are **not** committed to the repo because of GitHub's per-file size limit. The zip is included; unzip it before running the notebook (see below). The model is regenerated when the notebook runs.
+> **Note:** The unzipped dataset folder (~600 MB) and the trained model (`*.pkl`, ~1 GB) are intentionally not committed — they're either too big for GitHub or get regenerated by running the notebook. See `.gitignore` for the full list of skipped files.
 
-## Getting Started
+## 7. Getting Started
 
 ### Clone the repo
 
@@ -39,7 +106,7 @@ git clone https://github.com/SeyedMani/bluebook-bulldozer-project.git
 cd bluebook-bulldozer-project
 ```
 
-### Set up a virtual environment
+### Create a virtual environment and install dependencies
 
 Using `conda`:
 
@@ -53,7 +120,8 @@ Or using `venv`:
 
 ```bash
 python -m venv env
-source env/bin/activate
+source env/bin/activate          # on macOS / Linux
+# .\env\Scripts\activate         # on Windows
 pip install -r requirements.txt
 ```
 
@@ -73,13 +141,34 @@ This creates `data/bluebook-for-bulldozers/` with all the CSVs.
 jupyter notebook end-to-end-bluebook-bulldozer-price-regression-v2.ipynb
 ```
 
-Run the cells top-to-bottom. The full run takes a few minutes because the dataset is large and we train multiple Random Forests.
+Run cells top-to-bottom. The full run takes a few minutes because the dataset is large and we train multiple Random Forests.
 
-## Notes
+---
 
-- A few cells in the notebook are tagged `raises-exception` on purpose — they demonstrate what happens when you try to fit a model on un-preprocessed data, or call methods that fail before preprocessing. The notebook still executes end-to-end with `nbconvert --execute`.
-- The project is inspired by the [`mrdbourke/zero-to-mastery-ml`](https://github.com/mrdbourke/zero-to-mastery-ml) course, but the notebook has been rewritten with my own explanations and bug-fixed for newer versions of pandas and scikit-learn.
+## 8. Results (summary)
 
-## License
+The tuned Random Forest reaches a validation **RMSLE of ~0.25** on `TrainAndValid.csv` after a proper date-based split — competitive with the top Kaggle submissions for this task. Full numbers, plots, and feature-importance charts are inside the notebook.
 
-MIT — see [LICENSE](LICENSE).
+The top predictive features in the final model are roughly:
+
+1. `YearMade`
+2. `ProductSize`
+3. `Coupler_System`
+4. `fiSecondaryDesc`
+5. `Enclosure`
+
+Older, larger machines with more configuration options tend to sell for more — which lines up with what you'd expect intuitively.
+
+## 9. Notes
+
+- A few cells in the notebook are tagged `raises-exception` on purpose — they demonstrate what happens when you try to fit a model on un-preprocessed data, or call methods that fail before preprocessing. The notebook still executes end-to-end with `jupyter nbconvert --execute`.
+- The project is inspired by the [`mrdbourke/zero-to-mastery-ml`](https://github.com/mrdbourke/zero-to-mastery-ml) course, but the notebook has been rewritten in my own words and bug-fixed for newer versions of pandas (3.x) and scikit-learn.
+
+## 10. License
+
+This project is released under the MIT License — see [LICENSE](LICENSE).
+
+## 11. Acknowledgements
+
+- Dataset: [Kaggle Bluebook for Bulldozers competition](https://www.kaggle.com/c/bluebook-for-bulldozers)
+- Inspired by the "Complete Machine Learning & Data Science Bootcamp" end-to-end project layout.
