@@ -1,0 +1,49 @@
+# ----- Virtual environments -----
+env/
+venv/
+.venv/
+ENV/
+.env
+
+# ----- Jupyter -----
+.ipynb_checkpoints/
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ----- Trained model artifacts (too big for GitHub — regenerate by running the notebook) -----
+*.pkl
+*.joblib
+*.h5
+
+# ----- Data: keep the zip, ignore the unzipped folder -----
+# The full dataset is over GitHub's 100 MB per-file limit when unzipped.
+# The notebook will use the unzipped data locally; users clone, then unzip themselves.
+data/bluebook-for-bulldozers/
+!data/bluebook-for-bulldozers.zip
+
+# Generated intermediate files (created during notebook run)
+*.parquet
+
+# ----- IDE / editor -----
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ----- OS -----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ----- Logs -----
+*.log
